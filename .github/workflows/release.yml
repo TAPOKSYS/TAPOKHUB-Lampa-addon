@@ -1,0 +1,90 @@
+name: Релиз
+
+# Запускается, когда в репозиторий отправлен тег вида v0.10.0. Проверяет тесты и выкладывает описание на страницу Releases.
+# Тег со словом «pre» в названии помечается как pre-release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Тег должен совпадать с файлом VERSION
+        run: |
+          [ "${GITHUB_REF_NAME}" = "v$(cat VERSION)" ] || { echo "тег ${GITHUB_REF_NAME} не равен v$(cat VERSION)"; exit 1; }
+      - name: Тесты
+        run: scripts/test.sh
+      - name: Публикация
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=$(cat VERSION)
+          FLAGS=""
+          case "$V" in *-pre*) FLAGS="--prerelease" ;; esac
+          gh release create "${GITHUB_REF_NAME}" $FLAGS \
+            --title "TapokHub ${V}" \
+            --notes-file <(awk -v v="$V" '$0 ~ "^## "v {f=1; next} /^## / {f=0} f' CHANGELOG.md)
+
+  # Образ Docker (amd64 и arm64: обычные серверы, NAS, Raspberry Pi) в GitHub Container Registry:
+  #   ghcr.io/tapoksys/tapokhub-lampa-addon:<версия> и :latest
+  docker:
+    runs-on: ubuntu-latest
+    needs: release
+    steps:
+      - uses: actions/checkout@v4
+      - name: Проверка образа перед публикацией
+        run: scripts/docker-test.sh
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Сборка и публикация
+        run: |
+          V=$(cat VERSION)
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            --tag "$IMAGE:$V" --tag "$IMAGE:latest" --push .
+
+  # Общий файл плагина (адрес сервера вводится в настройках) на GitHub Pages:
+  #   https://<владелец>.github.io/<репозиторий>/tapokhub.js. Обновляется с каждым тегом релиза.
+  pages:
+    runs-on: ubuntu-latest
+    needs: release
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Сборка сайта
+        run: scripts/build-site.sh
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/site
+      - id: deployment
+        uses: actions/deploy-pages@v4

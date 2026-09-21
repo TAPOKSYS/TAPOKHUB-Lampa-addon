@@ -1,0 +1,9 @@
+# Caddy для compose.yaml (профиль https): сам получает и продлевает сертификат Let's Encrypt для TAPOK_DOMAIN
+# и передаёт запросы контейнеру TapokHub. Адрес клиента идёт в X-Real-IP: TapokHub верит ему только от адреса Caddy
+# (TAPOK_TRUSTED_PROXIES в compose.yaml), поэтому ограничение попыток входа считается по настоящему адресу посетителя.
+{$TAPOK_DOMAIN} {
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy tapokhub:8080 {
+		header_up X-Real-IP {remote_host}
+	}
+}

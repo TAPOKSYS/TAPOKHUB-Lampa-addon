@@ -1,0 +1,69 @@
+# TapokHub в Docker:  docker compose up -d
+# Адрес плагина для Lampa:  http://<адрес этого компьютера>:8080/tapokhub.js
+# Токен доступа (для входа «по токену» в плагине):  docker compose exec tapokhub cat /data/token
+#
+# Настройки задаются в файле .env рядом с этим файлом (все необязательные):
+#   TAPOK_PUBLIC_URL=https://tapok.example.com   адрес, по которому Lampa ходит на сервер (если он за своим прокси или не совпадает с адресом в запросе)
+#   TAPOK_ADMIN_EMAIL=you@example.com            почта администратора: с ней войдёте через аккаунт CUB (применяется на первом запуске)
+#   TAPOK_REGISTRATION=closed                    closed: войти могут только вы и те, кого добавите (по умолчанию); open: любой с аккаунтом CUB
+#   TAPOK_LIMIT_MOVIES=30 TAPOK_LIMIT_TV=5 TAPOK_LIMIT_FRANCHISES=5   пределы для каждого пользователя, кроме владельца (для демо-сервера; по умолчанию без них)
+#   TAPOK_LANG=en                                язык сообщений сервера, журнала и команд администратора: ru или en (по умолчанию язык системы, иначе ru)
+#   TAPOK_DOMAIN=tapok.example.com               домен для HTTPS через Caddy (нужен вместе с COMPOSE_PROFILES=https, см. ниже)
+#   COMPOSE_PROFILES=https                       включить Caddy: сертификат Let's Encrypt и HTTPS на портах 80 и 443 (убрать строку: Caddy выключен)
+#   TAPOK_PORT=8080                              порт на этом компьютере
+#   TAPOK_TRUSTED_PROXIES=172.29.0.250,172.29.0.1  кому верим в X-Real-IP: Caddy из этого файла и/или nginx на этом компьютере (он приходит с адреса 172.29.0.1)
+#   TAPOK_BIND=127.0.0.1                         принимать подключения только с этого компьютера (с HTTPS через Caddy; по умолчанию со всех адресов)
+#   TAPOK_VERSION=0.10.0                        версия образа (по умолчанию самая новая)
+services:
+  tapokhub:
+    build: .
+    image: ghcr.io/tapoksys/tapokhub-lampa-addon:${TAPOK_VERSION:-latest}
+    container_name: tapokhub
+    restart: unless-stopped
+    ports:
+      - "${TAPOK_BIND:-0.0.0.0}:${TAPOK_PORT:-8080}:8080"
+    volumes:
+      - tapokhub-data:/data
+    environment:
+      TAPOK_PUBLIC_URL: "${TAPOK_PUBLIC_URL:-}"
+      TAPOK_LANG: "${TAPOK_LANG:-}"
+      TAPOK_ADMIN_EMAIL: "${TAPOK_ADMIN_EMAIL:-}"
+      TAPOK_REGISTRATION: "${TAPOK_REGISTRATION:-closed}"
+      TAPOK_LIMIT_MOVIES: "${TAPOK_LIMIT_MOVIES:-}"
+      TAPOK_LIMIT_TV: "${TAPOK_LIMIT_TV:-}"
+      TAPOK_LIMIT_FRANCHISES: "${TAPOK_LIMIT_FRANCHISES:-}"
+      TAPOK_TRUSTED_PROXIES: "${TAPOK_TRUSTED_PROXIES:-172.29.0.250}"      # адрес Caddy в сети ниже: только ему верим в X-Real-IP (без профиля https безвредно)
+
+  # Необязательный HTTPS: включается профилем https (COMPOSE_PROFILES=https и TAPOK_DOMAIN в .env), по умолчанию выключен.
+  # Нужны открытые порты 80 и 443 и домен, указывающий на этот компьютер. Порты можно сменить: TAPOK_HTTP_PORT, TAPOK_HTTPS_PORT.
+  caddy:
+    profiles: ["https"]
+    image: caddy:2-alpine
+    container_name: tapokhub-caddy
+    restart: unless-stopped
+    depends_on:
+      - tapokhub
+    ports:
+      - "${TAPOK_HTTP_PORT:-80}:80"
+      - "${TAPOK_HTTPS_PORT:-443}:443"
+      - "${TAPOK_HTTPS_PORT:-443}:443/udp"
+    environment:
+      TAPOK_DOMAIN: "${TAPOK_DOMAIN:-}"
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      default:
+        ipv4_address: 172.29.0.250
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24
+
+volumes:
+  tapokhub-data:
+  caddy-data:
+  caddy-config:

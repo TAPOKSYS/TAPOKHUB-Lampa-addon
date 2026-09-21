@@ -1,0 +1,13 @@
+.git
+.github
+dist
+archive
+docs
+deploy
+**/__pycache__
+**/*.pyc
+*.sqlite3
+*.sqlite3-*
+.env
+plugin/tests
+server/tests

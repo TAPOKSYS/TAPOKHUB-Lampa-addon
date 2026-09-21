@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TapokHub plugin for Lampa</title>
+<style>
+:root{--bg:#0f1216;--fg:#e8eaed;--muted:#9aa4b2;--card:#171c23;--line:#262d38;--accent:#8ab4f8}
+@media (prefers-color-scheme:light){:root{--bg:#f6f7f9;--fg:#1b1f24;--muted:#5b6673;--card:#fff;--line:#dfe3e8;--accent:#1a5fd0}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,sans-serif}
+main{max-width:44rem;margin:0 auto;padding:2rem 16px 4rem}h1{margin:.2em 0 .1em;font-size:1.8rem}h2{margin-top:2rem;font-size:1.2rem}
+p.lead{color:var(--muted);margin:0 0 1.5rem}.box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem 1.1rem}
+code{font:.92em ui-monospace,monospace;background:var(--card);border:1px solid var(--line);border-radius:5px;padding:.1em .35em;word-break:break-all}
+.url{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}.url code{flex:1;min-width:0;font-size:1rem;padding:.5em .7em}
+button{font:inherit;background:var(--accent);color:#fff;border:0;border-radius:8px;padding:.5em 1em;cursor:pointer}
+a{color:var(--accent)}ol{padding-left:1.3rem}li{margin:.35rem 0}nav a{margin-right:1rem}
+</style></head>
+<body><main>
+<h1>TapokHub</h1>
+<p class="lead">Plugin for <a href="https://github.com/yumata/lampa-source">Lampa</a> · version @@VERSION@@ · <span lang="ru">плагин для Lampa</span></p>
+<nav><a href="#en">English</a><a href="#ru">Русский</a><a href="https://github.com/TAPOKSYS/TAPOKHUB-Lampa-addon">GitHub</a></nav>
+
+<div class="box url"><code id="url">…/tapokhub.js</code><button id="copy" type="button">Copy / Копировать</button></div>
+
+<section id="en"><h2>English</h2>
+<p>One plugin file for everyone. It needs your own TapokHub server: you enter its address in the plugin settings.</p>
+<ol>
+<li>Set up a server (one command, it runs in Docker): <a href="https://github.com/TAPOKSYS/TAPOKHUB-Lampa-addon/blob/main/README.en.md#quick-start">quick start</a>. Its address looks like <code>https://tapok.example.com</code>.</li>
+<li>In Lampa: Settings → Extensions → Add plugin, paste the address above, restart Lampa.</li>
+<li>Settings → TapokHub → “Enter the server address by hand” (or paste it from the clipboard).</li>
+<li>Settings → TapokHub → Authorization → “Sign in with a CUB account”.</li>
+</ol>
+<p>Lampa opened over <code>https://</code> needs an <code>https://</code> server address; the Lampa app on a TV or phone also works with <code>http://</code> in a home network.</p></section>
+
+<section id="ru" lang="ru"><h2>Русский</h2>
+<p>Один файл плагина для всех. Нужен свой сервер TapokHub: его адрес вводится в настройках плагина.</p>
+<ol>
+<li>Поставьте сервер (одна команда, работает в Docker): <a href="https://github.com/TAPOKSYS/TAPOKHUB-Lampa-addon#быстрый-старт">быстрый старт</a>. Адрес вида <code>https://tapok.example.com</code>.</li>
+<li>В Lampa: Настройки → Расширения → Добавить плагин, вставьте адрес выше, перезапустите Lampa.</li>
+<li>Настройки → TapokHub → «Ввести адрес сервера вручную» (или «Вставить адрес сервера из буфера обмена»).</li>
+<li>Настройки → TapokHub → Авторизация → «Войти через аккаунт CUB».</li>
+</ol>
+<p>Lampa, открытой по <code>https://</code>, нужен адрес сервера с <code>https://</code>; приложение Lampa на телевизоре и телефоне работает и с <code>http://</code> в домашней сети.</p></section>
+
+<script>
+var u = 'https://tapoksys.github.io/t.js';   // короткий адрес: репозиторий TAPOKSYS.github.io, его t.js подгружает tapokhub.js отсюда
+document.getElementById('url').textContent = u;
+document.getElementById('copy').onclick = function () { try { navigator.clipboard.writeText(u); this.textContent = 'OK'; } catch (e) { /* выделите вручную */ } };
+</script>
+</main></body></html>
