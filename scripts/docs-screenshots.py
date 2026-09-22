@@ -110,7 +110,8 @@ def main():
         b.shot(d, "franchise")
 
         # карточка фильма с кнопками TapokHub («В библиотеку», «Создать коллекцию», «Торренты»)
-        js(d, "Lampa.Activity.push({url:'', component:'full', id: 603, method:'movie', card:{id:603, title:'Матрица'}, source:'tmdb'})")
+        cid, ctitle = os.environ.get("SHOTS_CARD_ID", "45745"), os.environ.get("SHOTS_CARD_TITLE", "Синтел")
+        js(d, "Lampa.Activity.push({url:'', component:'full', id: +arguments[0], method:'movie', card:{id: +arguments[0], title: arguments[1]}, source:'tmdb'})", cid, ctitle)
         settle(6)
         b.shot(d, "card")
 
@@ -118,6 +119,8 @@ def main():
         js(d, "Lampa.Storage.set('tapokhub_autostart', true)")
         b.boot(d, f"{URL}/tapokhub.js", storage={"tapokhub_autostart": "true", "tapokhub_token": TOKEN})
         settle(0.5)
+        # под отсчётом лежит настоящая главная Lampa (постеры и метки качества раздач): в снимок она не попадает
+        js(d, "var s=document.createElement('style');s.textContent='.items-line,.card,.full-start,.scroll__content > *:not(.head){visibility:hidden!important}';document.head.appendChild(s)")
         b.shot(d, "autostart-countdown")
         for line in b.console(d):
             print(line)

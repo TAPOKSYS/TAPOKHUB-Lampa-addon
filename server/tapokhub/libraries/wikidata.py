@@ -52,7 +52,6 @@ class WikidataClient:
         self.label_langs = tuple(label_langs)   # языки названий по порядку предпочтения
         self.lock = threading.Lock()
         self.last = 0.0
-        self.requests = 0                 # сколько раз реально сходили в сеть (для тестов и диагностики)
         self.conn().executescript(CACHE_SCHEMA)
 
     # ---- низкий уровень
@@ -75,7 +74,6 @@ class WikidataClient:
                     self.sleep(wait)
                 try:
                     req = urllib.request.Request(self.base + "?" + urllib.parse.urlencode(params), headers={"User-Agent": UA})
-                    self.requests += 1
                     with urllib.request.urlopen(req, timeout=self.timeout) as r:
                         body = r.read().decode("utf-8")
                     self.last = time.time()

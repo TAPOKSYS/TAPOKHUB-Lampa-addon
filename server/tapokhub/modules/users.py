@@ -22,7 +22,6 @@ import secrets
 import threading
 import time
 import urllib.error
-import urllib.parse
 import urllib.request
 
 from tapokhub.core.config import CUB_DOMAINS  # noqa: F401 (список доменов задаёт core/config, здесь его используют и тесты)

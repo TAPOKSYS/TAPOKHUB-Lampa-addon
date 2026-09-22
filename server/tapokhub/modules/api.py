@@ -15,7 +15,6 @@ from typing import Any
 from tapokhub.core.common import UpstreamError
 from tapokhub import __version__
 from tapokhub.core.config import Config
-from tapokhub.core.net import RateLimiter
 from tapokhub.modules.proxy import NAME_RE, Proxy
 from tapokhub.modules.users import OWNER, LoginError
 from tapokhub.modules.web import Web

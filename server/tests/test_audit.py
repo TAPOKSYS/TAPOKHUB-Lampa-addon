@@ -2,7 +2,6 @@
 import os as _os
 _os.environ["TAPOK_LANG"] = "ru"      # тесты проверяют русские тексты; английские: test_i18n.py
 import http.client
-import json
 import sqlite3
 import sys
 import tempfile

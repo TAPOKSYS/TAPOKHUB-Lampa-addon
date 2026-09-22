@@ -464,7 +464,7 @@ class Library:
     def _entries(self, want: dict, details: dict, in_collection: dict, root_key: tuple | None = None) -> list[dict]:
         """Классификация, дубли, итоговые записи."""
         items = []
-        for key, srcs in want.items():
+        for key in want:
             n = details.get(key)
             if not n:
                 continue          # TMDB про неё ничего не знает (Wikidata бывает устаревшей)
