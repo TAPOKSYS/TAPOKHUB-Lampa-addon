@@ -7,6 +7,7 @@
   collections ...            коллекции главного экрана
   telegram ...               Telegram-боты пользователей
   warm, refresh-key          прогрев кеша, обновление ключа TMDB
+  ai-recs                    собрать ИИ-подборку владельца сейчас (нужен TAPOK_AI_KEY)
 """
 
 from __future__ import annotations
@@ -43,6 +44,10 @@ def warm_loop(proxy: Proxy, stop: threading.Event) -> None:
                 log.info(tr("библиотека: на обновление поставлено франшиз: %d"), n)
         except Exception:  # noqa: BLE001
             log.exception(tr("обновление библиотеки упало"))
+        try:
+            proxy.ai.daily()                     # ИИ-подборка дня владельца (если задан TAPOK_AI_KEY)
+        except Exception:  # noqa: BLE001
+            log.exception(tr("ИИ-подборка упала"))
         stop.wait(proxy.cfg.warm_interval)
 
 
@@ -230,6 +235,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd")
     sub.add_parser("serve")
     sub.add_parser("warm")
+    sub.add_parser("ai-recs")
     sub.add_parser("refresh-key")
     sub.add_parser("stats")
     col = sub.add_parser("collections")
@@ -338,6 +344,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(proxy.health(), ensure_ascii=False, indent=2))
     elif cmd == "warm":
         print(json.dumps(proxy.warm(), ensure_ascii=False))
+    elif cmd == "ai-recs":
+        print(json.dumps(proxy.ai.refresh(force=True) if proxy.ai.enabled else {"enabled": False}, ensure_ascii=False, indent=2))
     elif cmd == "refresh-key":
         print(tr("ключ обновлён из Lampa") if proxy.refresh_key_from_lampa() else tr("не удалось"))
     elif cmd == "library":

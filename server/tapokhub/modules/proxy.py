@@ -23,6 +23,7 @@ from tapokhub.core.config import Config
 from tapokhub.core.net import RateLimiter, SingleFlight, http_get
 from tapokhub.core.store import Store
 from tapokhub.libraries.tmdb_logos import pick_logo
+from tapokhub.modules.ai_recs import AiRecs
 from tapokhub.modules.library import Library
 from tapokhub.modules.telegram import Telegram
 from tapokhub.modules.users import Users
@@ -84,6 +85,7 @@ class Proxy:
         self.writes = 0            # сколько записей в кеш сделано; каждые EVICT_EVERY проверяем предел кеша
         self.users = Users(self.store, cfg.token, cfg.cub_domains)
         self.library = Library(self)
+        self.ai = AiRecs(self.library)
         self.telegram = Telegram(self)
 
     def bump(self, name: str) -> None:

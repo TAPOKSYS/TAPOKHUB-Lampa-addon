@@ -437,6 +437,7 @@ TH.auth = (function () {
 
         TH.settingsTitle(MAIN, TH.t('Сервер: для владельца'));
         TH.registration.settings();  // «Регистрация на сервере»: открытая или закрытая (меняет владелец)
+        TH.aiKey.settings();         // «Ключ ИИ для подборки»: DeepSeek или совместимый сервис (задаёт владелец)
 
         TH.settingsTitle(MAIN, TH.t('О плагине'));
         Lampa.SettingsApi.addParam({

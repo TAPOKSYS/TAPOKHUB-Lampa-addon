@@ -34,6 +34,7 @@ from tapokhub.core.common import DAY, UpstreamError
 from tapokhub.libraries.tmdb_logos import pick_logo
 from tapokhub.libraries.wikidata import WikidataClient, WikidataError
 from tapokhub.core.i18n import default_lang, tr
+from tapokhub.modules.users import OWNER
 
 log = logging.getLogger("tapokhub.library")
 
@@ -1043,6 +1044,28 @@ class Library:
             if not isinstance(seeds, list) or not isinstance(exclude or [], list):
                 return 400, {"error": "seeds required"}
             return 200, {"items": self.recommend([x for x in seeds if isinstance(x, dict)], [x for x in (exclude or []) if isinstance(x, dict)])}
+
+        if parts == ["ai-key"] and method in ("GET", "POST"):
+            ai = self.proxy.ai
+            if user != OWNER:
+                return (200, {"admin": False}) if method == "GET" else (403, {"error": tr("ключ ИИ задаёт только владелец сервера")})
+            if method == "POST":
+                if not isinstance(data.get("key"), str) or not ai.set_key(data["key"]):
+                    return 400, {"error": tr("это не похоже на ключ ИИ")}
+                log.info(tr("ключ ИИ %s (из настроек плагина)"), tr("задан") if ai.enabled else tr("убран"))
+                if ai.enabled and not ai.busy:
+                    threading.Thread(target=lambda: self.store.run_and_close(ai.refresh, user, True), daemon=True).start()
+            return 200, ai.key_info()
+
+        if parts == ["ai-picks"] and method == "GET":
+            return 200, self.proxy.ai.get(user)
+        if parts == ["ai-picks", "refresh"] and method == "POST":
+            ai = self.proxy.ai
+            if user != OWNER or not ai.enabled:
+                return 403, {"error": "forbidden"}
+            if not ai.busy:
+                threading.Thread(target=lambda: self.store.run_and_close(ai.refresh, user, True), daemon=True).start()
+            return 200, dict(ai.get(user), busy=True)
 
         if parts == ["stats"] and method == "GET":
             return 200, self.stats(user)

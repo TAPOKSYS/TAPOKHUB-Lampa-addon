@@ -59,6 +59,15 @@ EN: dict = {
     "создан токен доступа, он лежит в файле %s": "access token created, it is stored in file %s",
     "нужен токен (TAPOK_TOKEN, файл токена или TAPOK_AUTO_TOKEN=1; не короче 16 символов)": "a token is required (TAPOK_TOKEN, a token file or TAPOK_AUTO_TOKEN=1; at least 16 characters)",
     "прогрев упал": "warm-up failed",
+    "ИИ-подборка упала": "AI picks failed",
+    "ключ ИИ задаёт только владелец сервера": "only the server owner can set the AI key",
+    "это не похоже на ключ ИИ": "this does not look like an AI key",
+    "ключ ИИ %s (из настроек плагина)": "AI key %s (from the plugin settings)",
+    "задан": "set",
+    "ИИ-подборка: сохранено позиций %d": "AI picks: items saved: %d",
+    "ИИ-подборка не получилась: %s": "AI picks failed: %s",
+    "в библиотеке пока ничего нет": "the library is still empty",
+    "ИИ не предложил ничего подходящего": "the AI suggested nothing suitable",
     "библиотека: на обновление поставлено франшиз: %d": "library: franchises queued for refresh: %d",
     "обновление библиотеки упало": "library refresh failed",
     "не использовался": "never used",
@@ -199,5 +208,5 @@ EN: dict = {
     "wikidata: лимит/сбой (%s), жду %s с": "wikidata: rate limit/failure (%s), waiting %s s",
     "wikidata: %s слишком популярен (%s+ связей по %s), не раскрываем": "wikidata: %s is too popular (%s+ links by %s), not expanding",
     # справка верхнего уровня: ключ равен докстрингу server/tapokhub/cli.py
-    "TapokHub: сервер и команды администратора.\n\n  serve                      запустить сервер (по умолчанию)\n  stats                      состояние кеша и сервера\n  users ...                  пользователи, токены устройств, вход через CUB, регистрация\n  library ...                коллекции-франшизы\n  collections ...            коллекции главного экрана\n  telegram ...               Telegram-боты пользователей\n  warm, refresh-key          прогрев кеша, обновление ключа TMDB\n": "TapokHub: the server and the administrator commands.\n\n  serve                      start the server (the default)\n  stats                      the state of the cache and the server\n  users ...                  users, device tokens, CUB sign-in, registration\n  library ...                franchise collections\n  collections ...            home screen collections\n  telegram ...               users' Telegram bots\n  warm, refresh-key          cache warm-up, updating the TMDB key\n",
+    "TapokHub: сервер и команды администратора.\n\n  serve                      запустить сервер (по умолчанию)\n  stats                      состояние кеша и сервера\n  users ...                  пользователи, токены устройств, вход через CUB, регистрация\n  library ...                коллекции-франшизы\n  collections ...            коллекции главного экрана\n  telegram ...               Telegram-боты пользователей\n  warm, refresh-key          прогрев кеша, обновление ключа TMDB\n  ai-recs                    собрать ИИ-подборку владельца сейчас (нужен TAPOK_AI_KEY)\n": "TapokHub: the server and the administrator commands.\n\n  serve                      start the server (the default)\n  stats                      the state of the cache and the server\n  users ...                  users, device tokens, CUB sign-in, registration\n  library ...                franchise collections\n  collections ...            home screen collections\n  telegram ...               users' Telegram bots\n  warm, refresh-key          cache warm-up, updating the TMDB key\n  ai-recs                    build the owner's AI picks now (needs TAPOK_AI_KEY)\n",
 }

@@ -1072,7 +1072,7 @@ window.TapokHub.collections.add({ id: 'test-mixed', title: 'Тест: смеша
     var flow = function (map) {   // ответы по «методу путь»
         respond = function (method, url, body) {
             var path = url.replace(LB + '/lib/', '');
-            var f = map[method + ' ' + path] || map[method + ' *'];
+            var f = map[method + ' ' + path] || map[method + ' ' + path.split('?')[0]] || map[method + ' *'];
             if (typeof f === 'function') return f(body, path);
             return f || [null, {}];
         };
@@ -3174,6 +3174,26 @@ window.TapokHub.collections.add({ id: 'test-mixed', title: 'Тест: смеша
         assert.ok(s.emptied, 'сервер ничего не нашёл — пусто, без падения');
     });
 
+    await test('рекомендации: подборка дня от ИИ — первая строка, причина в описании, меню долгого нажатия; без ответа или выключено — строки нет', async function () {
+        resetRecs();
+        favLists.history = [{ id: 10, title: 'Свежий', original_title: 'Fresh' }]; timeline['h:Fresh'] = 100;
+        var ai = { enabled: true, items: [{ id: 70, media_type: 'movie', title: 'ИИ1', poster_path: '/x.jpg', why: 'Потому что', overview: 'Описание' }, { id: 71, media_type: 'tv', name: 'ИИ2', poster_path: '/y.jpg' }] };
+        flow({ 'GET ai-picks': [null, ai], 'POST recommend': [null, { items: [{ id: 50, media_type: 'movie', title: 'Р1', poster_path: '/a.jpg' }] }] });
+        var s = await openRecs();
+        var g = s.sections();
+        assert.deepStrictEqual(g.map(function (x) { return x.title; }), ['Подборка дня от ИИ', 'Фильмы по вашим просмотрам · учтено 1 фильм']);
+        assert.deepStrictEqual(g[0].cards.map(function (c) { return c.id; }), [70, 71]);
+        assert.strictEqual(g[0].cards[0].overview, 'Потому что\n\nОписание');
+        var menu = []; g[0].cards[0].params.emit.onMenu(menu);
+        assert.deepStrictEqual(menu.map(function (m) { return m.title; }), ['TapokHub', 'В библиотеку', 'Создать коллекцию']);
+        flow({ 'GET ai-picks': [null, { enabled: false, items: [] }], 'POST recommend': [null, { items: [{ id: 50, media_type: 'movie', title: 'Р1', poster_path: '/a.jpg' }] }] });
+        g = (await openRecs()).sections();
+        assert.deepStrictEqual(g.map(function (x) { return x.title; }), ['Фильмы по вашим просмотрам · учтено 1 фильм'], 'у не владельца и без ключа строки ИИ нет');
+        flow({ 'GET ai-picks': [{ status: 0 }, null], 'POST recommend': [null, { items: [{ id: 50, media_type: 'movie', title: 'Р1', poster_path: '/a.jpg' }] }] });
+        g = (await openRecs()).sections();
+        assert.deepStrictEqual(g.map(function (x) { return x.title; }), ['Фильмы по вашим просмотрам · учтено 1 фильм'], 'сервер не ответил по подборке ИИ — остальное показываем');
+    });
+
     /* ---------- вход: токен устройства, аккаунт CUB, ручной токен ---------- */
 
     var authCalls = [];
@@ -3370,6 +3390,69 @@ window.TapokHub.collections.add({ id: 'test-mixed', title: 'Тест: смеша
             assert.strictEqual(sent.length, n);
             assert.ok(/сначала войдите/.test(calls.noty[calls.noty.length - 1]));
         } finally { TH.lib.transport = realTransport; TH.proxy.configure(prevBase); }
+    });
+
+    await test('Ключ ИИ: пункт на главной странице, владелец вводит или убирает ключ, ключ уходит на сервер и назад не показывается', async function () {
+        var item = (calls.settingsParams || []).filter(function (p) { return p.component === 'tapokhub' && p.param.name === 'tapokhub_ai_key'; })[0];
+        assert.ok(item, 'пункт «Ключ ИИ для подборки» есть на главной странице настроек');
+        var k = TH.aiKey;
+        assert.strictEqual(k.describe({ admin: false }), 'Настраивает владелец сервера');
+        assert.ok(/^Не задан/.test(k.describe({ admin: true, set: false })));
+        assert.strictEqual(k.describe({ admin: true, set: true, hint: 'WXYZ', source: 'settings', day: '2026-11-07' }), 'Задан: …WXYZ · подборка от 2026-11-07');
+        assert.ok(/в настройках сервера/.test(k.describe({ admin: true, set: true, hint: 'WXYZ', source: 'server' })));
+        assert.ok(/не удалась: HTTP 402/.test(k.describe({ admin: true, set: true, hint: 'WXYZ', error: 'HTTP 402' })));
+        assert.ok(/собирается/.test(k.describe({ admin: true, set: true, hint: 'WXYZ', busy: true })));
+
+        var realTransport = TH.lib.transport, prevBase = TH.proxy.base(), sent = [], answer, prevDollar = global.$;
+        var text = '';
+        global.$ = function () { return { text: function (t) { text = t; return this; }, append: function () {} }; };
+        TH.lib.transport = function (method, url, body, cb) { sent.push({ method: method, url: url, body: body }); cb(answer[0], answer[1]); };
+        try {
+            TH.proxy.configure(LB);
+
+            // ключа нет: нажатие сразу открывает ввод, ключ без пробелов уходит на сервер
+            answer = [null, { admin: true, set: false }];
+            item.onRender({ append: function () {} });
+            assert.ok(/\/lib\/ai-key$/.test(sent[0].url) && sent[0].method === 'GET');
+            assert.ok(/^Не задан/.test(text));
+            calls.input = null; calls.noty = []; calls.select = null;
+            item.onChange();
+            assert.ok(calls.input && calls.input.params.free && calls.input.params.nosave, 'системная клавиатура Lampa');
+            answer = [null, { admin: true, set: true, hint: 'WXYZ', source: 'settings' }];
+            calls.input.cb(' sk-abc def WXYZ ');
+            var post = sent.filter(function (x) { return x.method === 'POST'; }).pop();
+            assert.deepStrictEqual(post.body, { key: 'sk-abcdefWXYZ' });
+            assert.ok(/ключ ИИ сохранён/.test(calls.noty[calls.noty.length - 1]));
+            assert.ok(/^Задан: …WXYZ/.test(text), 'строка обновилась, виден только хвост');
+
+            // ключ есть: нажатие открывает выбор; «Убрать ключ» шлёт пустой ключ
+            item.onRender({ append: function () {} });
+            calls.select = null; item.onChange();
+            assert.deepStrictEqual(calls.select.items.map(function (i) { return i.act; }), ['enter', 'clear']);
+            answer = [null, { admin: true, set: false }];
+            calls.select.onSelect(calls.select.items[1]);
+            post = sent.filter(function (x) { return x.method === 'POST'; }).pop();
+            assert.deepStrictEqual(post.body, { key: '' });
+            assert.ok(/ключ ИИ убран/.test(calls.noty[calls.noty.length - 1]));
+
+            // сервер не принял ключ: человеку сказано почему
+            answer = [{ status: 400, message: 'x' }, null];
+            k.save('плохой');
+            assert.ok(/не похоже на ключ/.test(calls.noty[calls.noty.length - 1]));
+
+            // не владелец: объяснение, ввод не открывается
+            answer = [null, { admin: false }];
+            item.onRender({ append: function () {} });
+            calls.input = null; calls.noty = []; item.onChange();
+            assert.strictEqual(calls.input, null);
+            assert.ok(/только владелец/.test(calls.noty[0]));
+
+            // без входа на сервер не ходим
+            TH.proxy.configure('');
+            var n = sent.length; item.onRender({ append: function () {} });
+            assert.strictEqual(sent.length, n);
+            assert.ok(/войдите/.test(text));
+        } finally { TH.lib.transport = realTransport; TH.proxy.configure(prevBase); global.$ = prevDollar; }
     });
 
     await test('Регистрация: пункт на главной странице, владелец выбирает открытую или закрытую, остальные нет', async function () {
@@ -3580,7 +3663,7 @@ window.TapokHub.collections.add({ id: 'test-mixed', title: 'Тест: смеша
         var byComp = {};
         (calls.settingsParams || []).forEach(function (p) { (byComp[p.component] = byComp[p.component] || []).push(p); });
         var names = function (c) { return (byComp[c] || []).map(function (p) { return p.param.name || p.param.type; }); };
-        assert.deepStrictEqual(names('tapokhub'), ['title', 'tapokhub_server', 'tapokhub_open_auth', 'title', 'tapokhub_open_anim', 'tapokhub_autostart', 'title', 'tapokhub_open_play', 'tapokhub_delete_collection', 'title', 'tapokhub_open_tg', 'title', 'tapokhub_registration', 'title', 'tapokhub_version']);
+        assert.deepStrictEqual(names('tapokhub'), ['title', 'tapokhub_server', 'tapokhub_open_auth', 'title', 'tapokhub_open_anim', 'tapokhub_autostart', 'title', 'tapokhub_open_play', 'tapokhub_delete_collection', 'title', 'tapokhub_open_tg', 'title', 'tapokhub_registration', 'tapokhub_ai_key', 'title', 'tapokhub_version']);
         var heads = byComp.tapokhub.filter(function (p) { return p.param.type === 'title'; }).map(function (p) { return p.field.name; });
         assert.deepStrictEqual(heads, ['Подключение', 'Главный экран', 'Просмотр и библиотека', 'Уведомления', 'Сервер: для владельца', 'О плагине'], 'главная страница поделена на группы');
         var ver = byComp.tapokhub[byComp.tapokhub.length - 1];
@@ -3588,7 +3671,7 @@ window.TapokHub.collections.add({ id: 'test-mixed', title: 'Тест: смеша
         assert.ok(ver.field.description === TH.versionLabel && /^\d+\.\d+(\.\d+)? ?\S*/.test(ver.field.description) && ver.field.description.indexOf('@@') < 0, 'подпись версии подставлена сборкой: ' + ver.field.description);
         assert.ok(TH.version.indexOf('@@') < 0 && TH.version === fs.readFileSync(path.join(__dirname, '..', '..', 'VERSION'), 'utf8').trim(), 'версия в плагине равна файлу VERSION');
         var ver = require('fs').readFileSync(require('path').join(__dirname, '../../VERSION'), 'utf8').trim();
-        var label = ver.indexOf('-') < 0 ? ver : ver.split('.').slice(0, 2).join('.') + ' pre-release';   // как plugin/build.py: version_label
+        var label = ver.indexOf('-') < 0 ? ver : ver.split('.').slice(0, 2).join('.') + ' ' + (/^pre/.test(ver.split('-')[1]) ? 'pre-release' : ver.split('-')[1]);   // как plugin/build.py: version_label
         assert.strictEqual(TH.versionLabel, label, 'подпись версии в настройках следует файлу VERSION');
         assert.deepStrictEqual(names('tapokhub_auth'), ['title', 'tapokhub_status', 'title', 'tapokhub_login_cub', 'tapokhub_token_paste', 'tapokhub_token_input', 'title', 'tapokhub_logout']);
         assert.deepStrictEqual(names('tapokhub_anim'), ['title', 'title', 'tapokhub_anim_counters', 'tapokhub_anim_vcr', 'title', 'tapokhub_anim_crt', 'tapokhub_open_fx']);

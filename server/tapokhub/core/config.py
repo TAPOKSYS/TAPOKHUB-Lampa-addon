@@ -42,6 +42,9 @@ class Config:
     lampa_app_url: str = "https://yumata.github.io/lampa/app.min.js"
     wikidata_api: str = "https://www.wikidata.org/w/api.php"
     telegram_api: str = "https://api.telegram.org"
+    ai_url: str = "https://api.deepseek.com"    # ИИ-подборка дня (только владелец): OpenAI-совместимый адрес без /v1/chat/completions
+    ai_key: str = ""                             # пусто = подборка выключена
+    ai_model: str = "deepseek-chat"
     wd_min_interval: float = 3.0      # пауза между запросами к Wikidata
     wd_backoff: tuple = (30, 60, 120)  # ожидание при 429
     upstream_timeout: float = 15.0
@@ -96,6 +99,9 @@ def load_config() -> Config:
         lampa_app_url=os.environ.get("LAMPA_APP_URL", "https://yumata.github.io/lampa/app.min.js"),
         wikidata_api=os.environ.get("WIKIDATA_API", "https://www.wikidata.org/w/api.php"),
         telegram_api=os.environ.get("TAPOK_TELEGRAM_API", "https://api.telegram.org"),
+        ai_url=os.environ.get("TAPOK_AI_URL", "https://api.deepseek.com").rstrip("/"),
+        ai_key=os.environ.get("TAPOK_AI_KEY", "").strip(),
+        ai_model=os.environ.get("TAPOK_AI_MODEL", "deepseek-chat").strip(),
         wd_min_interval=float(os.environ.get("WD_MIN_INTERVAL", "3")),
         trusted_proxies=tuple(x.strip() for x in os.environ.get("TAPOK_TRUSTED_PROXIES", "").split(",") if x.strip()),
         cub_domains=tuple(x.strip() for x in os.environ["TAPOK_CUB_DOMAINS"].split(",") if x.strip()) if os.environ.get("TAPOK_CUB_DOMAINS") else CUB_DOMAINS,

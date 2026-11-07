@@ -20,7 +20,7 @@ SRC = PLUGIN / "src"
 LAYERS = {
     "core": ["core.js", "i18n.js", "i18n-en.js", "proxy.js", "tmdb.js", "auth.js"],
     "libraries": ["icons.js", "clock.js", "fx.js", "background.js", "backdrop.js", "card.js", "toast.js", "logos.js", "clipboard.js"],
-    "modules": ["collections.js", "status.js", "sync.js", "telegram.js", "registration.js", "play.js", "library/api.js", "recs.js", "library/screens.js",
+    "modules": ["collections.js", "status.js", "sync.js", "telegram.js", "registration.js", "ai-key.js", "play.js", "library/api.js", "recs.js", "library/screens.js",
                 "ui/line.js", "home/sections.js", "home/css.js", "home/anim.js", "home/fx-settings.js", "home/fx-edit.js",
                 "home/screen.js", "ui/autostart.js", "ui/embed.js"],
 }

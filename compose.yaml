@@ -7,6 +7,8 @@
 #   TAPOK_ADMIN_EMAIL=you@example.com            почта администратора: с ней войдёте через аккаунт CUB (применяется на первом запуске)
 #   TAPOK_REGISTRATION=closed                    closed: войти могут только вы и те, кого добавите (по умолчанию); open: любой с аккаунтом CUB
 #   TAPOK_LIMIT_MOVIES=30 TAPOK_LIMIT_TV=5 TAPOK_LIMIT_FRANCHISES=5   пределы для каждого пользователя, кроме владельца (для демо-сервера; по умолчанию без них)
+#   TAPOK_AI_KEY=sk-...                          ключ ИИ (можно вместо этого ввести в настройках плагина): раз в сутки подборка 18 фильмов и сериалов по библиотеке, видна только владельцу
+#   TAPOK_AI_URL=https://api.deepseek.com  TAPOK_AI_MODEL=deepseek-chat   адрес и модель ИИ (по умолчанию DeepSeek)
 #   TAPOK_LANG=en                                язык сообщений сервера, журнала и команд администратора: ru или en (по умолчанию язык системы, иначе ru)
 #   TAPOK_DOMAIN=tapok.example.com               домен для HTTPS через Caddy (нужен вместе с COMPOSE_PROFILES=https, см. ниже)
 #   COMPOSE_PROFILES=https                       включить Caddy: сертификат Let's Encrypt и HTTPS на портах 80 и 443 (убрать строку: Caddy выключен)
@@ -27,6 +29,9 @@ services:
     environment:
       TAPOK_PUBLIC_URL: "${TAPOK_PUBLIC_URL:-}"
       TAPOK_LANG: "${TAPOK_LANG:-}"
+      TAPOK_AI_KEY: "${TAPOK_AI_KEY:-}"
+      TAPOK_AI_URL: "${TAPOK_AI_URL:-https://api.deepseek.com}"
+      TAPOK_AI_MODEL: "${TAPOK_AI_MODEL:-deepseek-chat}"
       TAPOK_ADMIN_EMAIL: "${TAPOK_ADMIN_EMAIL:-}"
       TAPOK_REGISTRATION: "${TAPOK_REGISTRATION:-closed}"
       TAPOK_LIMIT_MOVIES: "${TAPOK_LIMIT_MOVIES:-}"

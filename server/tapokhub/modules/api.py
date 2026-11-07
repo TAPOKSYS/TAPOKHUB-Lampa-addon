@@ -44,7 +44,7 @@ SECURITY = {"X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer
 PAGE_CSP = "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"
 IMAGE_CSP = "default-src 'none'; sandbox"
 TOKEN_IN_PATH = re.compile(r"(/tmdb/)(?!auth/)[^/\s\"?]+")      # токен доступа лежит в адресе: в журнал он не попадает
-HEAVY = {"recommend", "franchises"}                              # тяжёлые POST: десятки запросов к TMDB или сборка коллекции
+HEAVY = {"recommend", "franchises", "ai-picks", "ai-key"}                              # тяжёлые POST: десятки запросов к TMDB или сборка коллекции
 MAX_CONNECTIONS = 256
 PLUGIN_PATHS = ("/tapokhub.js", "/t", "/t.js")                  # /t короткий: адрес плагина вводят пультом, каждая буква дорога
 

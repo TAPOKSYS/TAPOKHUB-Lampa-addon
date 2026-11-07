@@ -25,7 +25,7 @@ node plugin/tests/universal.js || fail=1
 step "плагин: общая сборка для GitHub Pages"
 scripts/build-site.sh dist/site.test >/dev/null || fail=1
 
-for t in test_proxy test_library test_users test_audit test_web test_security test_telegram test_i18n; do
+for t in test_proxy test_library test_users test_audit test_web test_security test_telegram test_i18n test_ai_recs; do
     step "сервер: $t"
     out=$(python3 "server/tests/$t.py" 2>&1); echo "$out" | grep -E "^(Ran|OK|FAILED|FAIL:|ERROR:)"
     echo "$out" | grep -q "^OK" || { echo "$out" | tail -30; fail=1; }

@@ -251,32 +251,85 @@ TH.lib.recommend = function (seeds, exclude, done) {
     TH.lib.request('POST', 'recommend', { seeds: seeds, exclude: exclude }, done);
 };
 
+// ИИ-подборка дня (только владелец, если на сервере задан ключ ИИ): { enabled, items, day, error }
+TH.lib.aiRecs = function (done) {
+    TH.lib.request('GET', 'ai-picks?t=' + Date.now(), null, done);
+};
+
+// Карточки рекомендаций с меню долгого нажатия (меню карточки Lampa): пункты TapokHub «В библиотеку» и «Создать коллекцию»
+function recCards(items) {
+    return cardsOf(items, true).map(function (card) {
+        card.params.emit.onMenu = function (menu) {
+            var kind = card.media_type;
+            var fail = function (err) { Lampa.Noty.show(err && err.status === 429 && err.message ? err.message : TH.t('Не удалось, повторите позже')); };
+
+            menu.push({ title: 'TapokHub', separator: true });
+            menu.push({
+                title: TH.t('В библиотеку'),
+                onSelect: function () {
+                    TH.lib.addItem(kind, card.id, function (err) {
+                        if (err) return fail(err);
+
+                        Lampa.Noty.show(TH.t('Добавлено в библиотеку'));
+                    });
+                }
+            });
+            menu.push({
+                title: TH.t('Создать коллекцию'),
+                onSelect: function () {
+                    TH.lib.createFranchise(kind, card.id, function (err) {
+                        if (err) return fail(err);
+
+                        Lampa.Noty.show(TH.t('Коллекция собирается, она появится в «Коллекциях»'));
+                    });
+                }
+            });
+        };
+
+        return card;
+    });
+}
+
 function RecommendScreen(object) {
     return GridScreen(gridParams(object, 6), function (done) {
         if (!TH.lib.enabled()) return done([]);
 
         var got = TH.recs.collect();
 
-        if (!got.seeds.length) {
-            Lampa.Noty.show(TH.t('Пока нечего рекомендовать: нужны досмотренные фильмы или сериалы (от ') + TH.recs.MIN_EPISODES + TH.t(' серий)'));
+        TH.lib.aiRecs(function (aiErr, ai) {
+            var rows = [];
+            var picks = !aiErr && ai && ai.enabled ? (ai.items || []) : [];
 
-            return done([]);
-        }
+            if (aiErr) Lampa.Noty.show(TH.t('Подборка ИИ недоступна: ') + (aiErr.status || aiErr.message || '?'));
+            else if (ai && ai.enabled && !picks.length) Lampa.Noty.show(ai.error ? TH.t('Подборка ИИ не собралась: ') + ai.error : TH.t('Подборка ИИ пока пуста'));
 
-        TH.lib.recommend(got.seeds, got.exclude, function (err, data) {
-            if (err || !data) {
-                Lampa.Noty.show(TH.t('Не удалось получить рекомендации, попробуйте позже'));
-
-                return done([]);
+            if (picks.length) {
+                // причину, по которой ИИ выбрал позицию, показываем в описании карточки
+                picks.forEach(function (c) { if (c.why) c.overview = c.why + (c.overview ? '\n\n' + c.overview : ''); });
+                rows.push({ title: TH.t('Подборка дня от ИИ'), cards: recCards(picks) });
             }
 
-            var items = data.items || [];
-            var pick = function (kind) { return items.filter(function (c) { return c.media_type === kind; }); };
+            if (!got.seeds.length) {
+                if (!rows.length) Lampa.Noty.show(TH.t('Пока нечего рекомендовать: нужны досмотренные фильмы или сериалы (от ') + TH.recs.MIN_EPISODES + TH.t(' серий)'));
 
-            done([
-                { title: TH.t('Фильмы по вашим просмотрам · учтено ') + got.movies + ' ' + TH.lib.plural(got.movies, [TH.t('фильм'), TH.t('фильма'), TH.t('фильмов')]), cards: cardsOf(pick('movie'), true) },
-                { title: TH.t('Сериалы по вашим просмотрам · учтено ') + got.tv + ' ' + TH.lib.plural(got.tv, [TH.t('сериал'), TH.t('сериала'), TH.t('сериалов')]), cards: cardsOf(pick('tv'), true) }
-            ]);
+                return done(rows);
+            }
+
+            TH.lib.recommend(got.seeds, got.exclude, function (err, data) {
+                if (err || !data) {
+                    if (!rows.length) Lampa.Noty.show(TH.t('Не удалось получить рекомендации, попробуйте позже'));
+
+                    return done(rows);
+                }
+
+                var items = data.items || [];
+                var pick = function (kind) { return items.filter(function (c) { return c.media_type === kind; }); };
+
+                done(rows.concat([
+                    { title: TH.t('Фильмы по вашим просмотрам · учтено ') + got.movies + ' ' + TH.lib.plural(got.movies, [TH.t('фильм'), TH.t('фильма'), TH.t('фильмов')]), cards: recCards(pick('movie')) },
+                    { title: TH.t('Сериалы по вашим просмотрам · учтено ') + got.tv + ' ' + TH.lib.plural(got.tv, [TH.t('сериал'), TH.t('сериала'), TH.t('сериалов')]), cards: recCards(pick('tv')) }
+                ]));
+            });
         });
     }, { backdrop: 'blur' });
 }
