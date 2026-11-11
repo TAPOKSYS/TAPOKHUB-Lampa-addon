@@ -1483,6 +1483,13 @@ window.TapokHub.collections.add({ id: 'test-mixed', title: 'Тест: смеша
             try { actor.params.emit.onlyEnter(); } finally { Lampa.Activity.push = realPush; }
             assert.deepStrictEqual(calls.pushed, [{ url: '', title: 'Актёр Один', component: 'actor', id: 1, source: 'tmdb' }], 'Enter открывает страницу актёра');
             assert.strictEqual(typeof s[3].cards[1].params.emit.onlyEnter, 'function');
+            var menu = []; s[3].cards[1].params.emit.onMenu(menu);
+            assert.deepStrictEqual(menu.map(function (m) { return m.title; }), ['TapokHub', 'Добавить в эту коллекцию', 'В библиотеку', 'Создать коллекцию'], 'меню фильма: пункты TapokHub, как в рекомендациях, плюс добавление в эту коллекцию');
+            var posted = []; flow({ 'GET franchises/7': [null, franchiseDetail()], 'POST franchises/7/add': function (body) { posted.push(body); return [null, {}]; } });
+            calls.replaced = []; menu[1].onSelect(); await wait(15);
+            assert.deepStrictEqual(posted, [{ kind: 'movie', id: 9001, scope: 'item' }], 'фильм уходит в эту коллекцию как одна позиция');
+            assert.deepStrictEqual(calls.replaced, [{}], 'экран перечитывается');
+            assert.ok(!actor.params.emit.onMenu, 'у карточки актёра меню TapokHub нет');
             var seen = jq(), unseen = jq();
             s[3].cards[1].params.emit.onCreate.call({ html: seen });
             assert.deepStrictEqual(seen.badges(), ['ПРОСМОТРЕНО'], 'просмотренный помечен');

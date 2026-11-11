@@ -2,19 +2,12 @@
 
 🇷🇺 [Русский](CHANGELOG.md) · 🇬🇧 English
 
+## 0.12.1
+- In the "More with" rows, a film's menu (long press) now has "Add to this collection", "Add to library" and "Create collection".
+
 ## 0.12.0
 - **More with.** The collection screen now has rows with films of the actors who appear in it: the actor's photo and their five best films.
 - **AI picks** got tidier: they no longer suggest what you have already seen, refresh only while Lampa is open, and there is a "Refresh AI picks now" button.
-
-## 0.11.3
-- **"Refresh AI picks now" button** in Settings → TapokHub (owner only): build the picks immediately without waiting two hours.
-
-## 0.11.2
-- **AI picks:** the AI is asked for 50 items instead of 30, so that 18 remain after the already seen ones are excluded.
-
-## 0.11.1
-- **AI picks refresh only while Lampa is open:** on launch and then every 2 hours (if the picks are older than two hours). While Lampa is closed, no AI tokens are spent. The server no longer builds the picks by itself once a day.
-- **The AI does not suggest what you have seen:** the plugin sends the server your "Watched" and "Watching" marks and the Lampa history, and the server excludes them, the whole library (previously only the 120 latest items) and earlier suggestions.
 
 ## 0.11.0
 - **AI picks of the day** (server owner only). Once a day the server asks an AI (OpenAI-compatible API, DeepSeek by default) for 18 movies and TV shows matching your library, checks each one in TMDB (made-up titles are dropped, items you already have and earlier picks are not repeated) and shows them as the first row of "Recommendations". The reason for each pick is in the card description. If the AI is unavailable, the previous picks stay.

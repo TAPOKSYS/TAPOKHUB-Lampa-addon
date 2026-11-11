@@ -372,12 +372,55 @@ function settingsCard(fid, c) {
     return card;
 }
 
+// Меню долгого нажатия (меню карточки Lampa): пункты TapokHub «В библиотеку» и «Создать коллекцию» (рекомендации, «Ещё с актёром»)
+function libraryMenu(card, first) {   // first: свой пункт перед стандартными (необязательно)
+    return function (menu) {
+        var kind = card.media_type;
+        var fail = function (err) { Lampa.Noty.show(err && err.status === 429 && err.message ? err.message : TH.t('Не удалось, повторите позже')); };
+
+        menu.push({ title: 'TapokHub', separator: true });
+        if (first) menu.push(first);
+        menu.push({
+            title: TH.t('В библиотеку'),
+            onSelect: function () {
+                TH.lib.addItem(kind, card.id, function (err) {
+                    if (err) return fail(err);
+
+                    Lampa.Noty.show(TH.t('Добавлено в библиотеку'));
+                });
+            }
+        });
+        menu.push({
+            title: TH.t('Создать коллекцию'),
+            onSelect: function () {
+                TH.lib.createFranchise(kind, card.id, function (err) {
+                    if (err) return fail(err);
+
+                    Lampa.Noty.show(TH.t('Коллекция собирается, она появится в «Коллекциях»'));
+                });
+            }
+        });
+    };
+}
+
 // Карточка фильма из ряда «Ещё с актёром»: просмотренное остаётся в ряду, но помечено значком
-function castCard(c) {
+function castCard(fid, c) {
     var card = TH.card(c, 'movie');
     var watched = false;
 
     try { watched = TH.recs.isWatched(c); } catch (e) { TH.log('cast: watched unavailable', e && e.message); }
+
+    card.params.emit.onMenu = libraryMenu(card, {
+        title: TH.t('Добавить в эту коллекцию'),
+        onSelect: function () {
+            TH.lib.addToFranchise(fid, 'movie', c.id, 'item', function (err) {
+                if (err) return Lampa.Noty.show(TH.t('Не удалось добавить, повторите'));
+
+                Lampa.Noty.show(TH.t('Добавлено в коллекцию'));
+                Lampa.Activity.replace({});   // перечитать экран: фильм появится в составе
+            });
+        }
+    });
 
     if (watched) {
         card.params.emit.onCreate = function () {
@@ -583,7 +626,7 @@ function FranchiseScreen(object) {
 
                     sections.push({
                         title: TH.t('Ещё с актёром: ') + a.actor.name,
-                        cards: [actorCard(a.actor)].concat((a.films || []).map(castCard))
+                        cards: [actorCard(a.actor)].concat((a.films || []).map(function (c) { return castCard(fid, c); }))
                     });
                 });
 

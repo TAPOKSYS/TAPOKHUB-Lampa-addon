@@ -272,32 +272,7 @@ TH.lib.aiPing = function () {
 // Карточки рекомендаций с меню долгого нажатия (меню карточки Lampa): пункты TapokHub «В библиотеку» и «Создать коллекцию»
 function recCards(items) {
     return cardsOf(items, true).map(function (card) {
-        card.params.emit.onMenu = function (menu) {
-            var kind = card.media_type;
-            var fail = function (err) { Lampa.Noty.show(err && err.status === 429 && err.message ? err.message : TH.t('Не удалось, повторите позже')); };
-
-            menu.push({ title: 'TapokHub', separator: true });
-            menu.push({
-                title: TH.t('В библиотеку'),
-                onSelect: function () {
-                    TH.lib.addItem(kind, card.id, function (err) {
-                        if (err) return fail(err);
-
-                        Lampa.Noty.show(TH.t('Добавлено в библиотеку'));
-                    });
-                }
-            });
-            menu.push({
-                title: TH.t('Создать коллекцию'),
-                onSelect: function () {
-                    TH.lib.createFranchise(kind, card.id, function (err) {
-                        if (err) return fail(err);
-
-                        Lampa.Noty.show(TH.t('Коллекция собирается, она появится в «Коллекциях»'));
-                    });
-                }
-            });
-        };
+        card.params.emit.onMenu = libraryMenu(card);
 
         return card;
     });
