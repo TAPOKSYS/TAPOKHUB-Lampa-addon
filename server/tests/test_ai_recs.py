@@ -128,9 +128,9 @@ class Base(unittest.TestCase):
         self.server.server_close()
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
-    def api(self, method, path, token=TOKEN):
+    def api(self, method, path, body=None, token=TOKEN):
         c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=15)
-        c.request(method, f"/tmdb/{token}/lib/{path}", body=b"{}" if method == "POST" else None, headers={"Content-Type": "application/json"})
+        c.request(method, f"/tmdb/{token}/lib/{path}", body=json.dumps(body or {}).encode() if method == "POST" else None, headers={"Content-Type": "application/json"})
         r = c.getresponse()
         out = r.read()
         c.close()
@@ -197,6 +197,25 @@ class Refresh(Base):
                                  for t in ("Мой фильм", "Выдумка", "Без постера", "Взрослое", "Годное", "Годное")]}
         res = self.ai.refresh()
         self.assertEqual([x["id"] for x in res["items"]], [300])               # и дубль «Годное» схлопнулся
+
+    def test_lampa_history_is_skipped_and_ping_waits_two_hours(self):
+        w = self.world
+        w.movies[310] = item("movie", 310, "Виденное в Lampa", 2020)
+        w.movies[311] = item("movie", 311, "Новое", 2021)
+        w.search[("movie", "Виденное в Lampa")] = [w.movies[310]]
+        w.search[("movie", "Новое")] = [w.movies[311]]
+        w.ai_answer = {"items": [{"title": t, "year": 2020, "kind": "movie", "why": ""} for t in ("Виденное в Lampa", "Новое")]}
+        self.assertEqual(self.api("POST", "ai-picks/ping", {"seen": ["movie:310", "мусор", "tv:x"]})[0], 200)
+        for _ in range(100):                                                   # ping запускает сборку в фоне
+            if not self.ai.busy and self.ai.get(1)["items"]:
+                break
+            time.sleep(0.05)
+        self.assertEqual([x["id"] for x in self.ai.get(1)["items"]], [311])
+        self.assertEqual(self.ai.seen(), {("movie", 310)})
+        n = len(w.ai_requests)
+        self.api("POST", "ai-picks/ping", {"seen": []})
+        time.sleep(0.3)
+        self.assertEqual(len(w.ai_requests), n)                                # не прошло двух часов — ИИ не спрашиваем
 
     def test_failure_keeps_previous_and_hides_key(self):
         self.want(3)
@@ -297,7 +316,7 @@ class Disabled(Base):
     def test_no_key_means_off(self):
         self.assertEqual(self.api("GET", "ai-picks")[1], {"enabled": False, "items": []})
         self.assertEqual(self.api("POST", "ai-picks/refresh")[0], 403)
-        self.ai.daily()
+        self.assertEqual(self.api("POST", "ai-picks/ping")[0], 403)
         self.assertEqual(self.world.ai_requests, [])
 
 

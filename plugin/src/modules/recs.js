@@ -91,6 +91,14 @@ TH.recs = (function () {
         return ranks;
     }
 
+    // Всё, что уже есть в Lampa: отметки «Просмотрено», «Смотрю» и история ('movie:1', 'tv:2'); для ИИ-подборки, чтобы не советовала виденное
+    function seenKeys() {
+        var keys = Object.keys(viewedSet()).concat(Object.keys(historyRank()));
+        var seen = {};
+
+        return keys.filter(function (k) { return !seen[k] && (seen[k] = true); }).slice(0, 4000);
+    }
+
     // Отдельные сериалы (карточки TMDB): те, что смотрю, от недавних к давним
     function watchingSeries(cards) {
         var ranks = historyRank();
@@ -243,7 +251,7 @@ TH.recs = (function () {
         } catch (e) { TH.log('automark hook failed', e && e.message); }
     }
 
-    return { historyRank: historyRank, watchingSeries: watchingSeries, splitCollections: splitCollections, isWatched: isWatched, viewedSet: viewedSet, isTv: isTv, collect: collect, autoMark: autoMark, install: install, MIN_EPISODES: MIN_EPISODES, MOVIE_DONE: MOVIE_DONE };
+    return { seenKeys: seenKeys, historyRank: historyRank, watchingSeries: watchingSeries, splitCollections: splitCollections, isWatched: isWatched, viewedSet: viewedSet, isTv: isTv, collect: collect, autoMark: autoMark, install: install, MIN_EPISODES: MIN_EPISODES, MOVIE_DONE: MOVIE_DONE };
 })();
 
 TH.lib.recommend = function (seeds, exclude, done) {
@@ -254,6 +262,11 @@ TH.lib.recommend = function (seeds, exclude, done) {
 // ИИ-подборка дня (только владелец, если на сервере задан ключ ИИ): { enabled, items, day, error }
 TH.lib.aiRecs = function (done) {
     TH.lib.request('GET', 'ai-picks?t=' + Date.now(), null, done);
+};
+
+// Сообщить серверу, что Lampa открыта: он обновит ИИ-подборку, если ей больше двух часов (владелец; остальным 403 без последствий)
+TH.lib.aiPing = function () {
+    TH.lib.request('POST', 'ai-picks/ping', { seen: TH.recs.seenKeys() }, function () {});
 };
 
 // Карточки рекомендаций с меню долгого нажатия (меню карточки Lampa): пункты TapokHub «В библиотеку» и «Создать коллекцию»

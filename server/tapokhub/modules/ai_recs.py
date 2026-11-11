@@ -25,8 +25,10 @@ CREATE TABLE IF NOT EXISTS ai_history(user_id INTEGER NOT NULL, kind TEXT NOT NU
     PRIMARY KEY(user_id, kind, tmdb_id));
 """
 WANT = 18             # сколько позиций в подборке
-ASK = 30              # сколько просим у ИИ: часть отсеется проверкой
+ASK = 50              # сколько просим у ИИ: часть отсеется проверкой (виденное, библиотека, прежние советы)
 PROFILE_MAX = 120     # сколько позиций библиотеки показываем ИИ (самые свежие)
+PING_EVERY = 2 * 3600  # плагин сообщает «Lampa открыта»: обновляем подборку не чаще, чем раз в это число секунд
+SEEN_MAX = 4000       # сколько виденного в Lampa принимаем от плагина
 HISTORY_SHOW = 150    # сколько прежних советов напоминаем ИИ, чтобы не повторял
 
 
@@ -175,7 +177,8 @@ class AiRecs:
             if not nodes:
                 raise AiError(tr("в библиотеке пока ничего нет"))
             hist = self.history(user)
-            skip = {(n["kind"], n["id"]) for n in nodes} | {(h["kind"], h["tmdb_id"]) for h in hist}
+            ids = self.lib.stats(user)["ids"]       # вся библиотека, а не только показанные ИИ позиции
+            skip = {(k, i) for k in ("movie", "tv") for i in ids[k]} | {(h["kind"], h["tmdb_id"]) for h in hist} | self.seen()
             names = [t for t in (self._title_of(h["kind"], h["tmdb_id"]) for h in hist[:HISTORY_SHOW]) if t]
             found, seen = [], set()
             for want in self.ask(nodes, names):
@@ -212,7 +215,19 @@ class AiRecs:
         r = self.lib.row("SELECT * FROM ai_recs WHERE user_id=?", user)
         return {"enabled": True, "busy": self.busy, "day": r["day"] if r else "", "items": json.loads(r["items"]) if r else [], "error": r["error"] if r else None}
 
-    def daily(self) -> None:
-        """Вызывается из фонового цикла: раз в сутки обновить подборку владельца."""
-        if self.enabled:
-            self.refresh(OWNER)
+    def set_seen(self, keys) -> None:
+        """Запомнить виденное в Lampa (отметки, «Смотрю», история) — приходит от плагина вместе с «Lampa открыта»."""
+        if isinstance(keys, list):
+            good = [k for k in keys if isinstance(k, str) and re.fullmatch(r"(movie|tv):\d{1,9}", k)][:SEEN_MAX]
+            self.store.meta_set("ai_seen", json.dumps(good))
+
+    def seen(self) -> set:
+        try:
+            return {(k.split(":")[0], int(k.split(":")[1])) for k in json.loads(self.store.meta_get("ai_seen") or "[]")}
+        except (ValueError, IndexError):
+            return set()
+
+    def stale(self, user: int = OWNER) -> bool:
+        """Подборки нет или она (или последняя попытка) старше PING_EVERY секунд."""
+        r = self.lib.row("SELECT at FROM ai_recs WHERE user_id=?", user)
+        return not r or time.time() - (r["at"] or 0) >= PING_EVERY

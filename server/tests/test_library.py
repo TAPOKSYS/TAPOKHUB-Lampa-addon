@@ -128,6 +128,7 @@ class World:
         self.counts = {"tmdb": 0, "wd": 0}
         self.wd_429 = 0            # столько ближайших запросов к Wikidata получат 429
         self.tmdb_down = False
+        self.discover = []         # номера актёров, чьи movie_credits запрашивали
         outer = self
 
         class H(http.server.BaseHTTPRequestHandler):
@@ -165,6 +166,13 @@ class World:
                 m = re.match(r"^/3/(movie|tv)/(\d+)/recommendations$", path)
                 if m:
                     return self.reply(200, {"results": d.get("recs", {}).get((m[1], int(m[2])), [])})
+                m = re.match(r"^/3/(movie|tv)/(\d+)/(credits|aggregate_credits)$", path)
+                if m:
+                    return self.reply(200, {"cast": d.get("credits", {}).get((m[1], int(m[2])), [])})
+                m = re.match(r"^/3/person/(\d+)/movie_credits$", path)
+                if m:
+                    outer.discover.append(m[1])
+                    return self.reply(200, {"cast": d.get("person_credits", {}).get(int(m[1]), [])})
                 m = re.match(r"^/3/(movie|tv)/(\d+)/external_ids$", path)
                 if m:
                     return self.reply(200, {"wikidata_id": d["external"].get((m[1], int(m[2])))})
@@ -240,6 +248,7 @@ class Base(unittest.TestCase):
         self.world.counts.update(tmdb=0, wd=0)
         self.world.wd_429 = 0
         self.world.tmdb_down = False
+        self.world.discover = []
         self.tmpdir = Path(tempfile.mkdtemp(prefix="tapok-lib-"))
         self.cfg = Config(
             data_dir=self.tmpdir, token=TOKEN, listen_port=0, api_upstream=self.world.url, img_upstream=self.world.url,
@@ -538,6 +547,63 @@ class Resolve(Base):
         self.assertNotEqual(a, b)
         self.assertEqual(self.lib.dedupe(1), [])
         self.assertEqual(len(self.lib.rows("SELECT id FROM franchises")), 2)
+
+    def test_cast_picks_three_closest_actors_five_best_films_each(self):
+        fid = self.build("movie", 1000)
+        d = self.detail(fid)
+        members = [(c["media_type"], c["id"]) for g in d["groups"] for c in g["items"]]
+        ids = [i for k, i in members if k == "movie"]
+        cast = lambda aid, order: {"id": aid, "name": f"Актёр {aid}", "profile_path": f"/p{aid}.jpg", "order": order}
+        credits = {}
+        for n, mid in enumerate(ids):
+            row = [cast(11, 0), cast(12, 1 + n % 2), cast(13, 2)]
+            if n == 0:
+                row += [cast(14, 3), cast(15, 30)]                 # 14 один раз, 15 дальше предела титров
+            credits[("movie", mid)] = row
+        self.world.data["credits"] = credits
+
+        def film(i, order=0, rating=None, votes=5000, character="Герой", **kw):
+            m = {"id": i, "title": f"Фильм {i}", "original_title": f"Orig {i}", "release_date": "2010-01-01", "vote_average": rating if rating is not None else 9 - i / 1000,
+                 "vote_count": votes, "poster_path": f"/f{i}.jpg", "backdrop_path": None, "overview": "", "order": order, "character": character, "genre_ids": []}
+            m.update(kw)
+            return m
+        mine = ids[0]
+        self.world.data["person_credits"] = {
+            11: [film(9001), film(mine), film(9002, adult=True), film(9003, poster_path=None)] + [film(9010 + i) for i in range(10)] + [
+                film(9100, order=12, rating=9.9),                                   # эпизод: глубоко в титрах
+                film(9101, order=0, rating=9.8, character="Groot (voice)"),         # озвучка
+                film(9102, order=1, rating=9.7, character="Himself"),               # играет сам себя
+                film(9103, order=2, rating=9.6, genre_ids=[99]),                    # документальное
+                film(9104, order=1, rating=9.5, release_date="2099-01-01"),         # ещё не вышел
+                film(9105, order=5, rating=9.4)],                                   # шестой в титрах: граница, остаётся
+            12: [film(9001), film(9020), film(9021)],
+            13: [film(9030)],
+            14: [film(9040)],
+        }
+        got = self.lib.cast_picks(fid)
+        self.assertEqual([a["actor"]["id"] for a in got], [11, 12, 13], "три ближайших; 14 и 15 не попали")
+        first = [c["id"] for c in got[0]["films"]]
+        self.assertEqual(first, [9105, 9001, 9010, 9011, 9012], "пять лучших: без фильма коллекции, adult, без постера, эпизода, озвучки, «себя», документального и невышедшего")
+        self.assertEqual([c["id"] for c in got[1]["films"]], [9020, 9021], "9001 уже у первого актёра; меньше пяти - сколько есть")
+        self.assertEqual(got[2]["actor"], {"id": 13, "name": "Актёр 13", "photo": "/p13.jpg"})
+        self.assertEqual(got[2]["films"][0]["media_type"], "movie")
+        self.assertEqual(sorted(self.world.discover), ["11", "12", "13"], "по одному запросу movie_credits на актёра")
+
+    def test_cast_picks_adds_less_known_films_only_when_not_enough(self):
+        fid = self.build("movie", 1000)
+        ids = [c["id"] for g in self.detail(fid)["groups"] for c in g["items"] if c["media_type"] == "movie"]
+        self.world.data["credits"] = {("movie", i): [{"id": 11, "name": "А", "profile_path": None, "order": 0}] for i in ids}
+        mk = lambda i, votes, rating: {"id": i, "title": f"Ф{i}", "original_title": f"O{i}", "release_date": "2010-01-01", "vote_average": rating,
+                                       "vote_count": votes, "poster_path": f"/f{i}.jpg", "order": 1, "character": "X", "genre_ids": []}
+        self.world.data["person_credits"] = {11: [mk(9001, 5000, 7.0), mk(9002, 300, 9.0), mk(9003, 50, 9.5)]}
+        films = self.lib.cast_picks(fid)[0]["films"]
+        self.assertEqual([c["id"] for c in films], [9001, 9002], "известный первым, малоизвестный (200+ голосов) добран; меньше 200 голосов не берём")
+
+    def test_cast_picks_api_and_empty_cases(self):
+        fid = self.build("movie", 1000)
+        st, r = self.api("GET", f"franchises/{fid}/cast-picks")
+        self.assertEqual((st, r), (200, {"actors": []}), "титров нет - пусто")
+        self.assertEqual(self.api("GET", "franchises/99999/cast-picks")[0], 404)
 
     def test_stats_counts_distinct_visible_items_and_ready_collections(self):
         fid = self.build("movie", 1000)

@@ -45,6 +45,9 @@ CATALOGUE_MIN = 30
 FRANCHISE_CLASSES = {"Q196600", "Q130371093", "Q1667921"}     # медиафраншиза, кинофраншиза, серия романов
 CATALOGUE_LABEL = re.compile(r"фильмы студии|мультфильмы студии|films (?:by|of|from) |filmography|filmografi|список|list of", re.I)
 
+# Роли, которые не показываем: озвучка, камео, «играет себя», без указания в титрах
+CAST_MINOR = re.compile(r"\b(voice|self|himself|herself|themselves|cameo|uncredited|archive|footage)\b|голос|озвуч|камео|себя", re.I)
+
 QID_RE = re.compile(r"^Q\d{1,12}$")
 WD_PROPS = ("P8345", "P179")          # франшиза, серия: только эти связи Wikidata
 
@@ -844,6 +847,83 @@ class Library:
             out.append(card)
         return out
 
+    # ---- «Ещё с этими актёрами»
+
+    CAST_ACTORS = 3             # сколько актёров, самых близких к коллекции
+    CAST_FILMS = 5              # сколько лучших фильмов у каждого (с фото актёра первой карточкой ряд из 6 = ширина сетки)
+    CAST_ORDER_MAX = 8          # актёр коллекции: дальше этого места в титрах его в её фильме не считаем
+    CAST_ROLE_ORDER = 5         # фильм актёра в ряду: его роль не дальше этого места в титрах (0 - первая); дальше - эпизод
+    CAST_MEMBERS_MAX = 40       # сколько позиций коллекции разбираем (у крупных вселенных хватает и этого)
+    CAST_VOTES = (1000, 200)    # порог числа голосов; если фильмов не хватило, берём второй, ниже
+
+    def cast_picks(self, fid: int) -> list[dict]:
+        """Три актёра, ближайших к коллекции (больше всего её позиций, при равенстве ближе к началу титров),
+        и у каждого CAST_FILMS лучших по рейтингу фильмов, которых в коллекции нет. -> [{actor, films}].
+        Фильм, где играют двое из троих, показывается только у первого. Просмотренное сервер не знает: отмечает плагин."""
+        rows = self.rows("SELECT kind, tmdb_id FROM franchise_items WHERE franchise_id=? AND hidden=0", fid)
+        members = {(r["kind"], r["tmdb_id"]) for r in rows}
+        keys = sorted(members)[: self.CAST_MEMBERS_MAX]
+        if not keys:
+            return []
+
+        def credits(k):
+            d = self.tmdb(f"{k[0]}/{k[1]}/" + ("credits" if k[0] == "movie" else "aggregate_credits"))
+            return (d or {}).get("cast") or []
+
+        with ThreadPoolExecutor(max_workers=self.workers) as pool:
+            casts = list(pool.map(lambda k: self.store.run_and_close(credits, k), keys))
+        stat: dict[int, dict] = {}
+        for cast in casts:
+            for c in cast:
+                order = c.get("order")
+                if not isinstance(c.get("id"), int) or not isinstance(order, int) or order >= self.CAST_ORDER_MAX:
+                    continue
+                a = stat.setdefault(c["id"], {"id": c["id"], "name": c.get("name") or "", "photo": c.get("profile_path"), "n": 0, "sum": 0})
+                a["n"] += 1
+                a["sum"] += order
+        top = sorted(stat.values(), key=lambda a: (-a["n"], a["sum"] / a["n"], a["id"]))[: self.CAST_ACTORS]
+        if not top:
+            return []
+
+        today = self.today()
+
+        def films_of(actor_id: int) -> list[dict]:
+            """Фильмы актёра, где у него заметная роль: место в титрах не дальше CAST_ROLE_ORDER, не озвучка, не камео и не он сам.
+            Лучшие по рейтингу, сначала с числом голосов от CAST_VOTES[0], при нехватке добираем с CAST_VOTES[1]."""
+            d = self.tmdb(f"person/{actor_id}/movie_credits")
+            pool_: list[dict] = []
+            for r in (d or {}).get("cast") or []:
+                order = r.get("order")
+                if not isinstance(order, int) or order > self.CAST_ROLE_ORDER or CAST_MINOR.search(r.get("character") or ""):
+                    continue
+                if r.get("adult") or GENRE_DOCUMENTARY in (r.get("genre_ids") or ()) or not r.get("poster_path"):
+                    continue
+                if (r.get("release_date") or "9999") > today:
+                    continue
+                pool_.append(r)
+            best = lambda lo, hi: sorted((r for r in pool_ if lo <= (r.get("vote_count") or 0) < hi), key=lambda r: -(r.get("vote_average") or 0))
+            found = best(self.CAST_VOTES[0], 10 ** 9)
+            if len(found) < 2 * self.CAST_FILMS:               # с запасом на фильмы коллекции и на занятые другим актёром
+                found += best(self.CAST_VOTES[1], self.CAST_VOTES[0])
+            return found
+
+        with ThreadPoolExecutor(max_workers=self.workers) as pool:
+            lists = list(pool.map(lambda a: self.store.run_and_close(films_of, a["id"]), top))
+        taken = {k[1] for k in members if k[0] == "movie"}
+        out = []
+        for a, found in zip(top, lists):
+            films = []
+            for r in found:
+                if len(films) >= self.CAST_FILMS:
+                    break
+                if r.get("id") in taken or r.get("adult") or not r.get("poster_path"):
+                    continue
+                taken.add(r["id"])
+                films.append(card_of(normalize("movie", r)))
+            if films:
+                out.append({"actor": {"id": a["id"], "name": a["name"], "photo": a["photo"]}, "films": films})
+        return out
+
     # ---- дубли коллекций
 
     def dedupe(self, user: int, dry: bool = False) -> list[tuple[int, int]]:
@@ -1067,6 +1147,16 @@ class Library:
                 threading.Thread(target=lambda: self.store.run_and_close(ai.refresh, user, True), daemon=True).start()
             return 200, dict(ai.get(user), busy=True)
 
+        if parts == ["ai-picks", "ping"] and method == "POST":
+            # Lampa открыта у владельца: обновить подборку, если она старше двух часов (пока Lampa закрыта, токены не тратятся)
+            ai = self.proxy.ai
+            if user != OWNER or not ai.enabled:
+                return 403, {"error": "forbidden"}
+            ai.set_seen(data.get("seen"))
+            if not ai.busy and ai.stale(user):
+                threading.Thread(target=lambda: self.store.run_and_close(ai.refresh, user, True), daemon=True).start()
+            return 200, ai.get(user)
+
         if parts == ["stats"] and method == "GET":
             return 200, self.stats(user)
 
@@ -1121,6 +1211,8 @@ class Library:
                 return 200, self.franchise_summary(f)
             if len(parts) == 2 and method == "GET":
                 return 200, self.franchise_detail(fid, include_hidden=q.get("hidden") == "1")
+            if len(parts) == 3 and method == "GET" and parts[2] == "cast-picks":
+                return 200, {"actors": self.cast_picks(fid)}
             if len(parts) == 3 and method == "POST":
                 action = parts[2]
                 if action in ("hide", "add", "item-remove"):

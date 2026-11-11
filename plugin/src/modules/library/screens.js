@@ -372,6 +372,45 @@ function settingsCard(fid, c) {
     return card;
 }
 
+// Карточка фильма из ряда «Ещё с актёром»: просмотренное остаётся в ряду, но помечено значком
+function castCard(c) {
+    var card = TH.card(c, 'movie');
+    var watched = false;
+
+    try { watched = TH.recs.isWatched(c); } catch (e) { TH.log('cast: watched unavailable', e && e.message); }
+
+    if (watched) {
+        card.params.emit.onCreate = function () {
+            var html = this.html;
+            var view = html && html.find ? html.find('.card__view') : null;
+
+            if (html && html.addClass) html.addClass('tapokhub-card');
+
+            if (view) {
+                var mark = document.createElement('div');
+
+                mark.className = 'tapokhub-badge tapokhub-badge--seen';
+                mark.textContent = TH.t('ПРОСМОТРЕНО');
+                view.appendChild(mark);
+            }
+        };
+    }
+
+    return card;
+}
+
+// Первая карточка ряда «Ещё с актёром»: фото актёра с именем; Enter открывает страницу актёра в Lampa
+function actorCard(actor) {
+    var raw = { id: actor.id, media_type: 'person', title: actor.name, name: actor.name, poster_path: actor.photo || null, profile_path: actor.photo || null };
+    var card = TH.card(raw, 'person', { background: false });
+
+    card.params.emit.onlyEnter = function () {
+        Lampa.Activity.push({ url: '', title: actor.name, component: 'actor', id: actor.id, source: 'tmdb' });
+    };
+
+    return card;
+}
+
 // Что добавить: только выбранное, всю его коллекцию TMDB или всё связанное (франшиза целиком)
 function chooseScope(fid, r) {
     var prev = Lampa.Controller.enabled().name;
@@ -535,7 +574,21 @@ function FranchiseScreen(object) {
                 });
             });
 
-            done(sections);
+            if (settings) return done(sections);
+
+            // ряды «Ещё с актёром»: не задерживают экран дольше таймаута, при сбое просто не показываются
+            TH.lib.castPicks(fid, function (actors) {
+                actors.forEach(function (a) {
+                    if (!a.films || !a.films.length) return;   // у актёра нечего показать - без ряда и без фото
+
+                    sections.push({
+                        title: TH.t('Ещё с актёром: ') + a.actor.name,
+                        cards: [actorCard(a.actor)].concat((a.films || []).map(castCard))
+                    });
+                });
+
+                done(sections);
+            });
         });
     });
 }

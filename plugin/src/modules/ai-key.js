@@ -107,6 +107,19 @@ TH.aiKey = (function () {
             },
             onChange: choose
         });
+
+        Lampa.SettingsApi.addParam({
+            component: 'tapokhub',
+            param: { name: 'tapokhub_ai_refresh', type: 'button' },
+            field: { name: TH.t('Обновить подборку ИИ сейчас'), description: TH.t('Собрать новую подборку, не дожидаясь двух часов (например, после добавления фильмов)') },
+            onChange: function () {
+                if (!TH.lib.enabled()) return noty(TH.t('TapokHub: сначала войдите в разделе «Авторизация»'));
+
+                TH.lib.request('POST', 'ai-picks/refresh', {}, function (err) {
+                    noty(err ? 'TapokHub: ' + explain(err) : TH.t('TapokHub: подборка собирается, загляните в «Рекомендации» через минуту'));
+                });
+            }
+        });
     }
 
     return { settings: settings, describe: describe, explain: explain, save: save };

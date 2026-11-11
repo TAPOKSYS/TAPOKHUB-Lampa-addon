@@ -85,6 +85,7 @@ TH.css = function () {
         '.card.tapokhub-off{opacity:.4}' +
         '.tapokhub-badge{position:absolute;left:.5em;top:.5em;z-index:2;padding:.15em .55em;border-radius:.4em;background:#ffd24a;color:#000;font-size:.85em;font-weight:700}' +
         '.tapokhub-badge--off{background:#555;color:#fff}' +
+        '.tapokhub-badge--seen{background:#2e9e5b;color:#fff}' +
         '.card.tapokhub-action .card__img{display:none}' +
         '.card.tapokhub-action .card__view{background:rgba(255,255,255,.08);padding-bottom:0;height:5.5em}' +
         '.card.tapokhub-action--on .card__view{background:rgba(255,255,255,.24)}' +

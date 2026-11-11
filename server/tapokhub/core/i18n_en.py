@@ -59,7 +59,6 @@ EN: dict = {
     "создан токен доступа, он лежит в файле %s": "access token created, it is stored in file %s",
     "нужен токен (TAPOK_TOKEN, файл токена или TAPOK_AUTO_TOKEN=1; не короче 16 символов)": "a token is required (TAPOK_TOKEN, a token file or TAPOK_AUTO_TOKEN=1; at least 16 characters)",
     "прогрев упал": "warm-up failed",
-    "ИИ-подборка упала": "AI picks failed",
     "ключ ИИ задаёт только владелец сервера": "only the server owner can set the AI key",
     "это не похоже на ключ ИИ": "this does not look like an AI key",
     "ключ ИИ %s (из настроек плагина)": "AI key %s (from the plugin settings)",

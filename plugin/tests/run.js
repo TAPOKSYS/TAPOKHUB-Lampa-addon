@@ -1464,6 +1464,44 @@ window.TapokHub.collections.add({ id: 'test-mixed', title: 'Тест: смеша
         return s;
     };
 
+    await test('экран франшизы: ряды «Ещё с актёром», просмотренное остаётся и помечено, в настройке рядов нет', async function () {
+        libCalls.length = 0;
+        var films = [{ id: 9001, title: 'Фильм А', original_title: 'A', release_date: '2010-01-01', poster_path: '/a.jpg', vote_average: 8.4 },
+                     { id: 9002, title: 'Фильм Б', original_title: 'B', release_date: '2011-01-01', poster_path: '/b.jpg', vote_average: 8.1 }];
+        flow({ 'GET franchises/7': [null, franchiseDetail()],
+               'GET franchises/7/cast-picks': [null, { actors: [{ actor: { id: 1, name: 'Актёр Один', photo: '/ph1.jpg' }, films: films }, { actor: { id: 2, name: 'Пусто' }, films: [] }] }] });
+        viewedIds.push(9001);
+        try {
+            var screen = calls.components.tapokhub_franchise({ franchise_id: 7 });
+            screen.fire('create'); await wait(15);
+            var s = screen.sections();
+            assert.deepStrictEqual(s.map(function (x) { return x.title; }), ['', 'Сага', 'Сериалы', 'Ещё с актёром: Актёр Один'], 'ряд пустого актёра не показывается');
+            assert.deepStrictEqual(s[3].cards.map(function (c) { return c.id; }), [1, 9001, 9002], 'первая карточка - актёр, затем фильмы; просмотренный остаётся в ряду');
+            var actor = s[3].cards[0];
+            assert.strictEqual(actor.media_type, 'person'); assert.strictEqual(actor.title, 'Актёр Один'); assert.strictEqual(actor.poster_path, '/ph1.jpg', 'фото актёра - картинка карточки');
+            calls.pushed = []; var realPush = Lampa.Activity.push; Lampa.Activity.push = function (o) { calls.pushed.push(o); };
+            try { actor.params.emit.onlyEnter(); } finally { Lampa.Activity.push = realPush; }
+            assert.deepStrictEqual(calls.pushed, [{ url: '', title: 'Актёр Один', component: 'actor', id: 1, source: 'tmdb' }], 'Enter открывает страницу актёра');
+            assert.strictEqual(typeof s[3].cards[1].params.emit.onlyEnter, 'function');
+            var seen = jq(), unseen = jq();
+            s[3].cards[1].params.emit.onCreate.call({ html: seen });
+            assert.deepStrictEqual(seen.badges(), ['ПРОСМОТРЕНО'], 'просмотренный помечен');
+            assert.ok(seen.classes['tapokhub-card']);
+            s[3].cards[2].params.emit.onCreate.call({ html: unseen });
+            assert.deepStrictEqual(unseen.badges(), [], 'непросмотренный без значка');
+        } finally { viewedIds.pop(); }
+
+        libCalls.length = 0;
+        await openSettings();
+        assert.ok(!libCalls.some(function (c) { return /cast-picks/.test(c.url); }), 'в режиме настройки актёров не запрашиваем');
+    });
+
+    await test('экран франшизы: сервер не отдал актёров или упал — экран как раньше', async function () {
+        flow({ 'GET franchises/7': [null, franchiseDetail()], 'GET franchises/7/cast-picks': [{ status: 500 }, null] });
+        var screen = calls.components.tapokhub_franchise({ franchise_id: 7 }); screen.fire('create'); await wait(15);
+        assert.deepStrictEqual(screen.sections().map(function (x) { return x.title; }), ['', 'Сага', 'Сериалы']);
+    });
+
     await test('«Настроить»: обычный экран показывает плитку, она включает режим настройки (замена экрана, а не новый в стеке)', async function () {
         flow({ 'GET franchises/7': [null, franchiseDetail()] });
         var screen = calls.components.tapokhub_franchise({ franchise_id: 7 }); screen.fire('create'); await wait(15);
@@ -3663,7 +3701,7 @@ window.TapokHub.collections.add({ id: 'test-mixed', title: 'Тест: смеша
         var byComp = {};
         (calls.settingsParams || []).forEach(function (p) { (byComp[p.component] = byComp[p.component] || []).push(p); });
         var names = function (c) { return (byComp[c] || []).map(function (p) { return p.param.name || p.param.type; }); };
-        assert.deepStrictEqual(names('tapokhub'), ['title', 'tapokhub_server', 'tapokhub_open_auth', 'title', 'tapokhub_open_anim', 'tapokhub_autostart', 'title', 'tapokhub_open_play', 'tapokhub_delete_collection', 'title', 'tapokhub_open_tg', 'title', 'tapokhub_registration', 'tapokhub_ai_key', 'title', 'tapokhub_version']);
+        assert.deepStrictEqual(names('tapokhub'), ['title', 'tapokhub_server', 'tapokhub_open_auth', 'title', 'tapokhub_open_anim', 'tapokhub_autostart', 'title', 'tapokhub_open_play', 'tapokhub_delete_collection', 'title', 'tapokhub_open_tg', 'title', 'tapokhub_registration', 'tapokhub_ai_key', 'tapokhub_ai_refresh', 'title', 'tapokhub_version']);
         var heads = byComp.tapokhub.filter(function (p) { return p.param.type === 'title'; }).map(function (p) { return p.field.name; });
         assert.deepStrictEqual(heads, ['Подключение', 'Главный экран', 'Просмотр и библиотека', 'Уведомления', 'Сервер: для владельца', 'О плагине'], 'главная страница поделена на группы');
         var ver = byComp.tapokhub[byComp.tapokhub.length - 1];

@@ -147,6 +147,13 @@ TH.lib = (function () {
         });
     };
 
+    // Актёры, ближайшие к коллекции, и их лучшие фильмы: [{actor, films}] или [] при любой проблеме (ряды просто не покажутся)
+    lib.castPicks = function (fid, done) {
+        race(function (cb) { lib.request('GET', 'franchises/' + fid + '/cast-picks', null, cb); }, function (data) {
+            done((data && data.actors) || []);
+        });
+    };
+
     lib.franchise = function (fid, hidden, done) {
         lib.request('GET', 'franchises/' + fid + (hidden ? '?hidden=1' : ''), null, done);
     };

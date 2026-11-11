@@ -285,6 +285,9 @@ TH.i18n.en = {
     'Ключ ИИ (DeepSeek), вида sk-…': 'AI key (DeepSeek), like sk-…',
     'TapokHub: ключ ИИ задаёт только владелец сервера': 'TapokHub: the AI key is set only by the server owner',
     'Ключ ИИ для подборки': 'AI key for the picks',
+    'Обновить подборку ИИ сейчас': 'Refresh AI picks now',
+    'Собрать новую подборку, не дожидаясь двух часов (например, после добавления фильмов)': 'Build new picks without waiting two hours (for example, after adding movies)',
+    'TapokHub: подборка собирается, загляните в «Рекомендации» через минуту': 'TapokHub: the picks are being built, check "Recommendations" in a minute',
     'Ввести другой ключ': 'Enter another key',
     'Убрать ключ': 'Remove the key',
     'DeepSeek или другой совместимый сервис. Хранится на сервере, меняет только владелец': 'DeepSeek or another compatible service. Stored on the server, only the owner can change it',
@@ -368,6 +371,9 @@ TH.i18n.en = {
     ' · любая кнопка отменяет': ' · any key cancels',
     'Запускать хаб при старте Lampa': 'Start the hub when Lampa starts',
     'Через 5 секунд после запуска откроется главный экран TapokHub; любая нажатая кнопка или касание в эти секунды отменяет запуск. Настройка только для этого устройства': '5 seconds after launch the TapokHub home screen opens; any key pressed or touch in those seconds cancels the launch. This setting applies to this device only',
+    // modules/library/screens.js (ряды «Ещё с актёром»)
+    'Ещё с актёром: ': 'More with ',
+    'ПРОСМОТРЕНО': 'WATCHED',
     // modules/ui/embed.js
     'Библиотека': 'Library',
     'Рекомендации': 'Recommendations'
